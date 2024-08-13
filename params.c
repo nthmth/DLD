@@ -93,7 +93,7 @@ int16_t i_smoothed_rawcvadc[NUM_CV_ADCS];
 
 //Change in pot since last process_adc
 int32_t pot_delta[NUM_POT_ADCS];
-int32_t cv_delta[NUM_POT_ADCS];
+int32_t cv_delta[NUM_CV_ADCS];
 
 
 float set_fade_increment(uint32_t samples)
@@ -444,15 +444,9 @@ void update_params(void)
 // *******  INF OFF **********
 // ******* LEVEL **********
 
-			if (mode[channel][LEVELCV_IS_MIX]==0)
-			{
-				t_combined = i_smoothed_potadc[LEVEL_POT*2+channel] + i_smoothed_cvadc[LEVEL*2+channel];
-				asm("usat %[dst], #12, %[src]" : [dst] "=r" (t_combined) : [src] "r" (t_combined));
-			}
-			else
-			{
-				t_combined = i_smoothed_potadc[LEVEL_POT*2+channel];
-			}
+			// NS: Use Channel A's Level CV to control level for both channels
+			t_combined = i_smoothed_potadc[LEVEL_POT*2+channel] + i_smoothed_cvadc[LEVEL*2+0];
+			asm("usat %[dst], #12, %[src]" : [dst] "=r" (t_combined) : [src] "r" (t_combined));
 
 			if (global_mode[LOG_DELAY_FEED])
 				param[channel][LEVEL] = log_taper[t_combined];
@@ -483,10 +477,11 @@ void update_params(void)
 			else
 				temp_f=(i_smoothed_potadc[REGEN_POT*2+channel]-3050)/950.0; // (4095-3050)/950 = 110% regeneration... (4000-3050)/950 = 100%
 
-			if (i_smoothed_cvadc[REGEN*2+channel] > 30)
-				temp_f = temp_f + (i_smoothed_cvadc[REGEN*2+channel] / 4096.0);
+			// NS: Use Channel A's Regen CV for both channels' regen values
+			if (i_smoothed_cvadc[REGEN*2+0] > 30)
+				temp_f = temp_f + (i_smoothed_cvadc[REGEN*2+0] / 4096.0);
 
-			else if (i_smoothed_cvadc[REGEN*2+channel] > 4080)
+			else if (i_smoothed_cvadc[REGEN*2+0] > 4080)
 				temp_f = temp_f + 1.0;
 
 			if (temp_f > 1.1)
@@ -508,12 +503,10 @@ void update_params(void)
 			param[channel][REGEN]=1.0;
 
 // ********* WINDOW *********
-			//
-			// If REGEN was wiggled while INF is held down, then scroll the loop
-			//
-			t = pot_delta[REGEN_POT*2+channel] + cv_delta[REGEN_POT*2+channel];
+			// NS: Always use Channel B Regen CV for windowing both channels
+			t = pot_delta[REGEN_POT*2+channel] + cv_delta[REGEN*2+1];
 
-			if (mode[channel][WINDOWMODE_POT]==WINDOW && (t != 0))
+			if (t != 0)
 			{
 				if (t < 0)
 				{
@@ -528,8 +521,7 @@ void update_params(void)
 				scroll_loop(channel, abs_amt, subtract);
 
 				pot_delta[REGEN_POT*2+channel]=0;
-				cv_delta[REGEN*2+channel]=0;
-
+				cv_delta[REGEN*2+1]=0;
 			}
 
 		}
@@ -541,15 +533,9 @@ void update_params(void)
 		// Each MIX pot sets two parameters: wet and dry
 		//
 
-		if (mode[channel][LEVELCV_IS_MIX])
-		{
-			t_combined = i_smoothed_potadc[MIX_POT*2+channel] + i_smoothed_cvadc[LEVEL*2+channel];
-			asm("usat %[dst], #12, %[src]" : [dst] "=r" (t_combined) : [src] "r" (t_combined));
-		}
-		else
-		{
-			t_combined = i_smoothed_potadc[MIX_POT*2+channel];
-		}
+		// NS: Always use Channel B Level CV for both channels' mix
+		t_combined = i_smoothed_potadc[MIX_POT*2+channel] + i_smoothed_cvadc[LEVEL*2+1];
+		asm("usat %[dst], #12, %[src]" : [dst] "=r" (t_combined) : [src] "r" (t_combined));
 
 		param[channel][MIX_DRY]=epp_lut[t_combined];
 		param[channel][MIX_WET]=epp_lut[4095 - t_combined];
