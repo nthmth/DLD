@@ -521,7 +521,14 @@ void update_params(void)
 				scroll_loop(channel, abs_amt, subtract);
 
 				pot_delta[REGEN_POT*2+channel]=0;
-				cv_delta[REGEN*2+1]=0;
+
+				// NS: We want to apply CV change to both channels,
+				// so we either want:
+				// - to reset cv_delta on channel 0 only if channel 1 is not in INF ON mode
+				// - or to reset cv_delta on channel 1, whether or not channel 0 is in INF ON mode
+				if ((channel == 0 && mode[1][INF]!=INF_ON) || (channel == 1)) {
+					cv_delta[REGEN*2+1]=0;
+				}
 			}
 
 		}
